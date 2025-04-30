@@ -1,0 +1,211 @@
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, SafeAreaView } from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { friends } from '@/data/mockData';
+import { formatCurrency } from '@/utils/prices';
+import { X, Send } from 'lucide-react-native';
+import Avatar from 'boring-avatars'
+import Button from '@/components/Button';
+import AmountInput from '@/components/AmountInput';
+import { getPrices } from '@/utils/prices';
+import { PriceObject } from '@/types';
+
+export default function SendMoneyScreen() {
+  const router = useRouter();
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const [amount, setAmount] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [gotPrice, setGotPrice] = useState(false);
+  const [prices, setPrices] = useState<PriceObject | undefined>(undefined);
+  
+  const recipient = friends.find(friend => friend.address === id);
+  
+  const handleClose = () => {
+    if(!router.canGoBack()) {
+      router.back()
+    } else {
+      router.push('/');
+    }
+  };
+
+  const handleChangeAmount = async (value: string) => {
+    if(!gotPrice) {
+      const prices = await getPrices();
+      if (!prices) {
+        console.log('No prices found');
+        return;
+      }
+      setPrices(prices)
+      setGotPrice(true);
+    }
+    
+    setAmount(value);
+  };
+  
+  const handleSend = async () => {
+    if (!amount || parseFloat(amount) <= 0) {
+      return;
+    }
+
+    setLoading(true);
+    console.log("Sending:", amount)
+    const amountInETH = getETHAmount();    
+    console.log("Amount in ETH:", amountInETH);
+    // await sendETH(amountInETH, recipient.address);
+    setLoading(false);
+    // router.navigate('/');
+  };
+
+  function getETHAmount(){
+    const priceResult = prices?.prices[0].value;
+    if (!priceResult || parseFloat(priceResult) <= 0) {
+      console.log("ETH price must be greater than zero");
+      return;
+    }
+    const price = parseFloat(priceResult);
+    return parseFloat(amount) / price;
+  }
+  
+  if (!recipient) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
+            <X size={24} color="#111827" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Send Money</Text>
+          <View style={styles.headerRight} />
+        </View>
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>Recipient not found</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+  
+  return (
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
+    >
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.header}>
+          <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
+            <X size={24} color="#111827" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Send Money</Text>
+          <View style={styles.headerRight} />
+        </View>
+        
+        <ScrollView style={styles.content}>
+          <View style={styles.recipientContainer}>
+            <Avatar
+              variant="beam"
+              name={recipient.name || recipient.address}
+              size={60}
+            />
+            <Text style={styles.recipientName}>{recipient.name}</Text>
+          </View>
+          
+          <View style={styles.formContainer}>
+            <AmountInput
+              value={amount}
+              onChangeValue={handleChangeAmount}
+            />
+            
+          </View>
+        </ScrollView>
+        
+        <View style={styles.footer}>
+          <Button
+            title={`Pay ${amount ? formatCurrency(parseFloat(amount)) : '$0.00'}`}
+            onPress={handleSend}
+            icon={<Send size={20} color="white" style={{ marginRight: 8 }} />}
+            disabled={!amount || parseFloat(amount) <= 0}
+            loading={loading}
+            fullWidth
+          />
+        </View>
+      </SafeAreaView>
+    </KeyboardAvoidingView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: 'white',
+  },
+  safeArea: {
+    flex: 1,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: Platform.OS === 'ios' ? 8 : 48,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  closeButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#111827',
+    fontFamily: 'Inter_600SemiBold',
+  },
+  headerRight: {
+    width: 40,
+  },
+  content: {
+    flex: 1,
+    padding: 16,
+  },
+  recipientContainer: {
+    alignItems: 'center',
+    marginVertical: 16,
+  },
+  recipientName: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#111827',
+    marginTop: 12,
+    fontFamily: 'Inter_600SemiBold',
+  },
+  recipientUsername: {
+    fontSize: 16,
+    color: '#6B7280',
+    marginTop: 4,
+    fontFamily: 'Inter_400Regular',
+  },
+  formContainer: {
+    marginTop: 16,
+  },
+  footer: {
+    padding: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#EF4444',
+    textAlign: 'center',
+    fontFamily: 'Inter_500Medium',
+  },
+});
