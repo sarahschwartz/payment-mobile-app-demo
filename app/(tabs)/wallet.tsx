@@ -8,6 +8,7 @@ import { Provider } from 'zksync-ethers';
 import { ethers } from 'ethers';
 import { PriceObject } from '@/types';
 import Avatar from 'boring-avatars';
+import { router } from 'expo-router';
 
 export default function WalletScreen() {
   const [prices, setPrices] = useState<PriceObject | undefined>(
@@ -64,7 +65,7 @@ export default function WalletScreen() {
           <Text style={styles.balanceLabel}>SSO Balance</Text>
           <Text style={styles.balanceAmount}>{amountInDollars ? formatCurrency(amountInDollars) : '0.00'}</Text>
           <View style={styles.actionButtons}>
-            <TouchableOpacity style={styles.actionButton}>
+            <TouchableOpacity onPress={() => router.push('/(tabs)/friends')} style={styles.actionButton}>
               <View style={styles.actionIconContainer}>
                 <ArrowUpRight size={20} color="#3B82F6" />
               </View>

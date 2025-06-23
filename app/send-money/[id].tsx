@@ -24,7 +24,7 @@ export default function SendMoneyScreen() {
     if(!router.canGoBack()) {
       router.back()
     } else {
-      router.push('/');
+      router.push('/(tabs)/friends');
     }
   };
 

@@ -33,6 +33,7 @@ export default function RootLayout() {
   return (
     <>
       <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="+not-found" options={{ title: 'Not Found' }} />
         <Stack.Screen 
@@ -40,19 +41,6 @@ export default function RootLayout() {
           options={{ 
             presentation: 'modal',
             animation: 'slide_from_bottom',
-          }} 
-        />
-        <Stack.Screen 
-          name="request-money/[id]" 
-          options={{ 
-            presentation: 'modal',
-            animation: 'slide_from_bottom',
-          }} 
-        />
-        <Stack.Screen 
-          name="transactions/[id]" 
-          options={{ 
-            animation: 'slide_from_right',
           }} 
         />
       </Stack>
