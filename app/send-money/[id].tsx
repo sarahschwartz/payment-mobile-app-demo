@@ -1,14 +1,24 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, SafeAreaView } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  SafeAreaView,
+} from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { friends } from '@/data/mockData';
 import { formatCurrency } from '@/utils/prices';
 import { X, Send } from 'lucide-react-native';
-import Avatar from 'boring-avatars'
+import Avatar from 'boring-avatars';
 import Button from '@/components/Button';
 import AmountInput from '@/components/AmountInput';
 import { getPrices } from '@/utils/prices';
 import { PriceObject } from '@/types';
+import Toast from 'react-native-toast-message';
 
 export default function SendMoneyScreen() {
   const router = useRouter();
@@ -17,55 +27,74 @@ export default function SendMoneyScreen() {
   const [loading, setLoading] = useState(false);
   const [gotPrice, setGotPrice] = useState(false);
   const [prices, setPrices] = useState<PriceObject | undefined>(undefined);
-  
-  const recipient = friends.find(friend => friend.address === id);
-  
+
+  const recipient = friends.find((friend) => friend.address === id);
+
   const handleClose = () => {
-    if(!router.canGoBack()) {
-      router.back()
+    if (!router.canGoBack()) {
+      router.back();
     } else {
       router.push('/(tabs)/friends');
     }
   };
 
   const handleChangeAmount = async (value: string) => {
-    if(!gotPrice) {
+    if (!gotPrice) {
       const prices = await getPrices();
       if (!prices) {
         console.log('No prices found');
         return;
       }
-      setPrices(prices)
+      setPrices(prices);
       setGotPrice(true);
     }
-    
+
     setAmount(value);
   };
-  
+
   const handleSend = async () => {
     if (!amount || parseFloat(amount) <= 0) {
       return;
     }
 
     setLoading(true);
-    console.log("Sending:", amount)
-    const amountInETH = getETHAmount();    
-    console.log("Amount in ETH:", amountInETH);
-    // await sendETH(amountInETH, recipient.address);
+    console.log('Sending:', amount);
+    const amountInETH = getETHAmount();
+    console.log('Amount in ETH:', amountInETH);
+    if (!amountInETH) {
+      console.log('Invalid ETH amount');
+      setLoading(false);
+      return;
+    }
+    if (!recipient || !recipient.address) {
+      console.log('Recipient address is not valid');
+      setLoading(false);
+      return;
+    }
+    await sendETH(amountInETH, recipient.address);
     setLoading(false);
-    // router.navigate('/');
+     Toast.show({
+      type: 'success',
+      text1: 'Transfer Sent 🚀',
+      text2: `You sent ${formatCurrency(parseFloat(amount))} to ${recipient.name || recipient.address}`,
+    });
+    router.push('/(tabs)/friends');
   };
 
-  function getETHAmount(){
+  async function sendETH(amount: number, recipientAddress: string) {
+    console.log(`Sending ${amount} ETH to ${recipientAddress}`);
+  }
+
+  function getETHAmount() {
     const priceResult = prices?.prices[0].value;
     if (!priceResult || parseFloat(priceResult) <= 0) {
-      console.log("ETH price must be greater than zero");
+      console.log('ETH price must be greater than zero');
       return;
     }
     const price = parseFloat(priceResult);
     return parseFloat(amount) / price;
   }
-  
+
   if (!recipient) {
     return (
       <SafeAreaView style={styles.container}>
@@ -82,7 +111,7 @@ export default function SendMoneyScreen() {
       </SafeAreaView>
     );
   }
-  
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -97,7 +126,7 @@ export default function SendMoneyScreen() {
           <Text style={styles.headerTitle}>Send Money</Text>
           <View style={styles.headerRight} />
         </View>
-        
+
         <ScrollView style={styles.content}>
           <View style={styles.recipientContainer}>
             <Avatar
@@ -107,19 +136,17 @@ export default function SendMoneyScreen() {
             />
             <Text style={styles.recipientName}>{recipient.name}</Text>
           </View>
-          
+
           <View style={styles.formContainer}>
-            <AmountInput
-              value={amount}
-              onChangeValue={handleChangeAmount}
-            />
-            
+            <AmountInput value={amount} onChangeValue={handleChangeAmount} />
           </View>
         </ScrollView>
-        
+
         <View style={styles.footer}>
           <Button
-            title={`Pay ${amount ? formatCurrency(parseFloat(amount)) : '$0.00'}`}
+            title={`Pay ${
+              amount ? formatCurrency(parseFloat(amount)) : '$0.00'
+            }`}
             onPress={handleSend}
             icon={<Send size={20} color="white" style={{ marginRight: 8 }} />}
             disabled={!amount || parseFloat(amount) <= 0}
