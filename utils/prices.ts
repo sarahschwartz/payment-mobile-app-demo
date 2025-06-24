@@ -3,16 +3,11 @@ import { utils } from "zksync-ethers"
 import { getData, storeData } from './storage';
 import { PriceObject } from '@/types';
 
-// ** THIS IS FOR DEMO PURPOSES ONLY **
-// ** DO NOT USE AN API KEY ON THE CLIENT IN PRODUCTION **
-
 // replace with your Alchemy API key
-const API_KEY = '<YOUR_ALCHEMY_API_KEY>';
+const API_KEY = process.env.ALCHEMY_API_KEY;
 
 export const getLatestPrices = async (addresses: TokenAddressRequest[] = []) => {
   try {
-    // ** THIS IS FOR DEMO PURPOSES ONLY **
-    // ** DO NOT USE AN API KEY ON THE CLIENT IN PRODUCTION **
     const alchemy = new Alchemy({ apiKey: API_KEY });
     const zksyncSepoliaETH: TokenAddressRequest = { network: alchemy.config.network, address: utils.ETH_ADDRESS};
     const response = await alchemy.prices.getTokenPriceByAddress([zksyncSepoliaETH, ...addresses]);
