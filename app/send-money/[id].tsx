@@ -12,29 +12,76 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { friends } from '@/data/mockData';
 import { formatCurrency } from '@/utils/prices';
-import { X, Send, FormInput } from 'lucide-react-native';
+import { X, Send } from 'lucide-react-native';
 import Avatar from 'boring-avatars';
 import Button from '@/components/Button';
 import AmountInput from '@/components/AmountInput';
 import { getPrices } from '@/utils/prices';
 import { PriceObject } from '@/types';
 import Toast from 'react-native-toast-message';
-import { parseEther } from 'viem';
-import { useSendTransaction } from 'wagmi';
+import { BaseError, isAddress, parseEther } from 'viem';
+import { useSendTransaction, useWaitForTransactionReceipt } from 'wagmi';
 import { privateKeyToAccount } from 'viem/accounts';
+import AddressInput from '@/components/AddressInput';
 
 export default function SendMoneyScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [amount, setAmount] = useState('');
-  // const [loading, setLoading] = useState(false);
   const [gotPrice, setGotPrice] = useState(false);
   const [prices, setPrices] = useState<PriceObject | undefined>(undefined);
+  const [address, setAddress] = useState<string>('');
 
-  const { sendTransaction, isError, isPending, isSuccess, data, error } =
-    useSendTransaction();
+   const {
+      data: hash,
+      error,
+      isPending,
+      sendTransaction,
+    } = useSendTransaction();
+  
+    const {
+      isLoading: isConfirming,
+      isSuccess: isConfirmed,
+    } = useWaitForTransactionReceipt({ hash });
+  
+  
+    React.useEffect(() => {
+      if (isConfirmed) {
+        Toast.show({
+          type: 'success',
+          text1: 'Transaction confirmed',
+          text2: hash ? `${hash.slice(0, 10)}…` : undefined,
+        });
+        router.push('/(tabs)/friends');
+      }
+    }, [isConfirmed, hash]);
+  
+    React.useEffect(() => {
+      if (error) {
+        Toast.show({
+          type: 'error',
+          text1: 'Transaction failed',
+          text2:
+            (error as BaseError).shortMessage ||
+            (error as Error).message ||
+            undefined,
+        });
+      }
+    }, [error]);
+  
+    React.useEffect(() => {
+      if (isPending) {
+        Toast.show({
+          type: 'info',
+          text1: 'Sending transaction…',
+          autoHide: true,
+          visibilityTime: 3000,
+        });
+      }
+    }, [isPending]);
+  
 
-  const recipient = friends.find((friend) => friend.address === id);
+    const friend = friends.find((friend) => friend.address === id);
 
   const handleClose = () => {
     if (!router.canGoBack()) {
@@ -69,25 +116,18 @@ export default function SendMoneyScreen() {
     console.log('Amount in ETH:', amountInETH);
     if (!amountInETH) {
       console.log('Invalid ETH amount');
-      // setLoading(false);
       return;
     }
-    if (!recipient || !recipient.address) {
+    if (!friend && !isAddress(address)) {
       console.log('Recipient address is not valid');
-      // setLoading(false);
+      Toast.show({
+      type: 'error',
+      text1: 'Address invalid',
+      text2: 'The recipient address input is not valid',
+    });
       return;
     }
-    await sendETH(amountInETH, recipient.address);
-    // setLoading(false);
-    console.log('is success:', isSuccess);  
-    Toast.show({
-      type: 'success',
-      text1: 'Transfer Sent 🚀',
-      text2: `You sent ${formatCurrency(parseFloat(amount))} to ${
-        recipient.name || recipient.address
-      }`,
-    });
-    router.push('/(tabs)/friends');
+    await sendETH(amountInETH, friend ? friend.address : address as `0x${string}`);
   };
 
   async function sendETH(amount: number, recipientAddress: `0x${string}`) {
@@ -125,39 +165,36 @@ export default function SendMoneyScreen() {
           <View style={styles.headerRight} />
         </View>
 
-        {!recipient ? (
-          <ScrollView style={styles.content}>
-          <View style={styles.recipientContainer}>
-            <Text style={styles.recipientName}>To:</Text>
-            <FormInput/>
-            <input name="address" placeholder="0xA0Cf…251e" required />
-            </View>
-            </ScrollView>
-            ) : (
         <ScrollView style={styles.content}>
+        {!friend ? (
+          <View style={styles.recipientContainer}>
+            <Text style={styles.recipientInputLabel}>To:</Text>
+            <AddressInput value={address} onChangeText={setAddress} />
+            </View>
+            ) : (
           <View style={styles.recipientContainer}>
             <Avatar
               variant="beam"
-              name={recipient.name || recipient.address}
+              name={friend.name || friend.address}
               size={60}
             />
-            <Text style={styles.recipientName}>{recipient.name}</Text>
+            <Text style={styles.recipientName}>{friend.name}</Text>
           </View>
+            )}
 
           <View style={styles.formContainer}>
             <AmountInput value={amount} onChangeValue={handleChangeAmount} />
           </View>
-        </ScrollView>
-            )}
+            </ScrollView>
 
         <View style={styles.footer}>
           <Button
-            title={`Pay ${
+            title={isPending || isConfirming ? 'Confirming…' :`Pay ${
               amount ? formatCurrency(parseFloat(amount)) : '$0.00'
             }`}
             onPress={handleSend}
             icon={<Send size={20} color="white" style={{ marginRight: 8 }} />}
-            disabled={!amount || parseFloat(amount) <= 0}
+            disabled={!amount || parseFloat(amount) <= 0 || isPending || isConfirming}
             loading={isPending}
             fullWidth
           />
@@ -222,6 +259,13 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     marginTop: 4,
     fontFamily: 'Inter_400Regular',
+  },
+  recipientInputLabel: {
+    fontSize: 24,
+    fontWeight: '600',
+    color: '#111827',
+    marginTop: 12,
+    fontFamily: 'Inter_600SemiBold',
   },
   formContainer: {
     marginTop: 16,

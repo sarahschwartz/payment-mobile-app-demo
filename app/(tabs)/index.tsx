@@ -10,19 +10,22 @@ import {
 } from 'react-native';
 import TransactionCard from '@/components/TransactionCard';
 import { Provider } from 'zksync-ethers';
-import type { Block, TransactionResponse } from 'zksync-ethers/build/types';
 import { getPrices } from '@/utils/prices';
-import { friends, currentUser } from '@/data/mockData';
-import { storeData, getData, removeData } from '@/utils/storage';
+import {
+  getData,
+  updateHashes,
+  maxTxnsLength,
+  getStoredHashes,
+  getNewTransfers,
+} from '@/utils/storage';
 import type { PriceObject, Tx } from '@/types';
+import { config } from '@/utils/wagmi-config';
+import { getBlock, getUniqueTxns } from '@/utils/blocks';
 
 export default function HomeScreen() {
   const [filter, setFilter] = useState<'all' | 'mine'>('all');
   const [txns, setTxns] = useState<Tx[]>();
   const [prices, setPrices] = useState<PriceObject | undefined>(undefined);
-
-  const hashesStorageKey = 'recentTxnHashes';
-  const maxTxnsLength = 5;
 
   useEffect(() => {
     const fetchPrices = async () => {
@@ -37,82 +40,23 @@ export default function HomeScreen() {
   }, []);
 
   useEffect(() => {
-    const rpcUrl = 'http://localhost:8011';
+    const rpcUrl = config.chains[0].rpcUrls.default.http[0];
     const zkProvider = new Provider(rpcUrl);
 
-    const getBlock = async (blockNumber: number): Promise<Block | null> => {
-      try {
-        const block = await zkProvider.getBlock(blockNumber);
-        return block;
-      } catch (err) {
-        console.error(`Failed to fetch block ${blockNumber}`, err);
-        return null;
-      }
-    };
-
-    const getStoredHashes = async (): Promise<string[]> => {
-      const hashes = (await getData(hashesStorageKey)) as string[] | null;
-      return Array.isArray(hashes) ? hashes : [];
-    };
-
-    const updateHashes = async (newTransfers: Tx[]) => {
-      const existing = await getStoredHashes();
-      const incoming = newTransfers.map((t) => t.hash);
-      const combined = [...existing, ...incoming];
-      const trimmed = combined.slice(-maxTxnsLength);
-      const toDelete = combined.slice(0, combined.length - trimmed.length);
-      for (const h of toDelete) await removeData(h);
-
-      await storeData(hashesStorageKey, trimmed);
-    };
-
-    const handleTx = async (txDetails: TransactionResponse) => {
-      if (!txDetails) return;
-
-      const isCurrentUser =
-        txDetails.from === currentUser.address ||
-        txDetails.to === currentUser.address;
-
-      const isFriend = friends.some(
-        (f) => f.address === txDetails.from || f.address === txDetails.to
-      );
-
-      if (!isCurrentUser && !isFriend) return;
-
-      const tx = { ...txDetails, isCurrentUser, isFriend } as Tx;
-      await storeData(tx.hash, tx);
-      return tx;
-    };
-
     const handleBlock = async (blockNumber: number) => {
-      const block = await getBlock(blockNumber);
-      if (
-        !block ||
-        !Array.isArray(block.transactions) ||
-        !block.transactions.length
-      ) {
-        console.log('No transactions in this block');
+      const block = await getBlock(zkProvider, blockNumber);
+      if (!block) {
+        console.log(`Failed to fetch block ${blockNumber}`);
         return;
       }
-
-      const newTransfers: Tx[] = [];
-
-      for (const txHash of block.transactions) {
-        const txDetails = await zkProvider.getTransaction(txHash);
-        const handled = await handleTx(txDetails);
-        if (handled) newTransfers.push(handled);
-      }
+      const newTransfers = await getNewTransfers(block, zkProvider);
 
       if (newTransfers.length) {
         await updateHashes(newTransfers);
         setTxns((prev = []) => {
           const merged = [...prev, ...newTransfers];
-          const unique = merged.reduce<Tx[]>((acc, t) => {
-            if (!acc.find((x) => x.hash === t.hash)) acc.push(t);
-            return acc;
-          }, []);
+          const unique = getUniqueTxns(merged);
           unique.sort((a, b) => b.blockNumber! - a.blockNumber!);
-          console.log('Unique transactions:', unique);
           return unique.slice(0, maxTxnsLength);
         });
       } else {
@@ -125,14 +69,16 @@ export default function HomeScreen() {
       if (!hashes.length) return;
 
       const stored = await Promise.all(
-        hashes.map(async (h) => (await getData(h)) as Tx | null)
+        hashes.map(async (h) => (await getData(h)) as Tx)
       );
-      setTxns(stored.filter(Boolean) as Tx[]);
+      if (!stored.length) return;
+      const unique = getUniqueTxns(stored);
+      setTxns(unique);
     };
+
     setup();
 
     zkProvider.on('block', handleBlock);
-
     return () => {
       zkProvider.off('block', handleBlock);
     };
@@ -179,7 +125,7 @@ export default function HomeScreen() {
     <SafeAreaView style={styles.container}>
       {txns && txns.length && (
         <FlatList
-          data={[...txns].reverse()}
+          data={txns.reverse()}
           keyExtractor={(item) => item?.hash as string}
           renderItem={({ item }) => {
             if (filter === 'mine' && !item.isCurrentUser) return null;
