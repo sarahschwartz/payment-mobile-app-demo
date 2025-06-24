@@ -6,10 +6,9 @@ import {
   FlatList,
   TouchableOpacity,
   SafeAreaView,
-  Platform
+  Platform,
 } from 'react-native';
 import TransactionCard from '@/components/TransactionCard';
-import { ethers } from 'ethers';
 import { Provider } from 'zksync-ethers';
 import type { Block, TransactionResponse } from 'zksync-ethers/build/types';
 import { getPrices } from '@/utils/prices';
@@ -20,9 +19,7 @@ import type { PriceObject, Tx } from '@/types';
 export default function HomeScreen() {
   const [filter, setFilter] = useState<'all' | 'mine'>('all');
   const [txns, setTxns] = useState<Tx[]>();
-  const [prices, setPrices] = useState<PriceObject | undefined>(
-    undefined
-  );
+  const [prices, setPrices] = useState<PriceObject | undefined>(undefined);
 
   const hashesStorageKey = 'recentTxnHashes';
   const maxTxnsLength = 5;
@@ -41,7 +38,6 @@ export default function HomeScreen() {
 
   useEffect(() => {
     const rpcUrl = 'http://localhost:8011';
-    const l1Provider = new ethers.JsonRpcProvider(rpcUrl);
     const zkProvider = new Provider(rpcUrl);
 
     const getBlock = async (blockNumber: number): Promise<Block | null> => {
@@ -66,12 +62,10 @@ export default function HomeScreen() {
       const trimmed = combined.slice(-maxTxnsLength);
       const toDelete = combined.slice(0, combined.length - trimmed.length);
       for (const h of toDelete) await removeData(h);
-    
+
       await storeData(hashesStorageKey, trimmed);
     };
-    
 
-    /* ---------- handle new txn ---------- */
     const handleTx = async (txDetails: TransactionResponse) => {
       if (!txDetails) return;
 
@@ -80,7 +74,7 @@ export default function HomeScreen() {
         txDetails.to === currentUser.address;
 
       const isFriend = friends.some(
-        (f) => f.address === txDetails.from || f.address === txDetails.to,
+        (f) => f.address === txDetails.from || f.address === txDetails.to
       );
 
       if (!isCurrentUser && !isFriend) return;
@@ -90,10 +84,13 @@ export default function HomeScreen() {
       return tx;
     };
 
-    /* ---------- handle new block ---------- */
     const handleBlock = async (blockNumber: number) => {
       const block = await getBlock(blockNumber);
-      if (!block || !Array.isArray(block.transactions) || !block.transactions.length) {
+      if (
+        !block ||
+        !Array.isArray(block.transactions) ||
+        !block.transactions.length
+      ) {
         console.log('No transactions in this block');
         return;
       }
@@ -109,31 +106,35 @@ export default function HomeScreen() {
       if (newTransfers.length) {
         await updateHashes(newTransfers);
         setTxns((prev = []) => {
-          const consolidated = [...prev, ...newTransfers];
-          consolidated.sort((a, b) => a.blockNumber! - b.blockNumber!);
-          return consolidated.slice(-maxTxnsLength);
+          const merged = [...prev, ...newTransfers];
+          const unique = merged.reduce<Tx[]>((acc, t) => {
+            if (!acc.find((x) => x.hash === t.hash)) acc.push(t);
+            return acc;
+          }, []);
+          unique.sort((a, b) => b.blockNumber! - a.blockNumber!);
+          console.log('Unique transactions:', unique);
+          return unique.slice(0, maxTxnsLength);
         });
       } else {
         console.log('No relevant transfers in this block');
       }
     };
 
-    /* ---------- get stored transactions ---------- */
     const setup = async () => {
-        const hashes = await getStoredHashes();
-        if (!hashes.length) return;
-  
-        const stored = await Promise.all(
-          hashes.map(async (h) => (await getData(h)) as Tx | null),
-        );
-        setTxns(stored.filter(Boolean) as Tx[]);
-      }
+      const hashes = await getStoredHashes();
+      if (!hashes.length) return;
+
+      const stored = await Promise.all(
+        hashes.map(async (h) => (await getData(h)) as Tx | null)
+      );
+      setTxns(stored.filter(Boolean) as Tx[]);
+    };
     setup();
 
-    l1Provider.on('block', handleBlock);
+    zkProvider.on('block', handleBlock);
 
     return () => {
-      l1Provider.off('block', handleBlock);
+      zkProvider.off('block', handleBlock);
     };
   }, []);
 
@@ -178,21 +179,19 @@ export default function HomeScreen() {
     <SafeAreaView style={styles.container}>
       {txns && txns.length && (
         <FlatList
-          data={txns.reverse()}
+          data={[...txns].reverse()}
           keyExtractor={(item) => item?.hash as string}
           renderItem={({ item }) => {
-            
-            if(filter === 'mine' && !item.isCurrentUser) return null;
+            if (filter === 'mine' && !item.isCurrentUser) return null;
             return (
-            <TransactionCard
-              transaction={item as Tx}
-              ethPrice={
-                prices
-                  ? parseFloat(prices?.prices[0].value)
-                  : undefined
-              }
-            />
-          )}}
+              <TransactionCard
+                transaction={item as Tx}
+                ethPrice={
+                  prices ? parseFloat(prices?.prices[0].value) : undefined
+                }
+              />
+            );
+          }}
           contentContainerStyle={styles.listContent}
           ListHeaderComponent={
             <>

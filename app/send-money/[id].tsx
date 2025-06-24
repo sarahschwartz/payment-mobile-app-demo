@@ -12,21 +12,27 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { friends } from '@/data/mockData';
 import { formatCurrency } from '@/utils/prices';
-import { X, Send } from 'lucide-react-native';
+import { X, Send, FormInput } from 'lucide-react-native';
 import Avatar from 'boring-avatars';
 import Button from '@/components/Button';
 import AmountInput from '@/components/AmountInput';
 import { getPrices } from '@/utils/prices';
 import { PriceObject } from '@/types';
 import Toast from 'react-native-toast-message';
+import { parseEther } from 'viem';
+import { useSendTransaction } from 'wagmi';
+import { privateKeyToAccount } from 'viem/accounts';
 
 export default function SendMoneyScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [amount, setAmount] = useState('');
-  const [loading, setLoading] = useState(false);
+  // const [loading, setLoading] = useState(false);
   const [gotPrice, setGotPrice] = useState(false);
   const [prices, setPrices] = useState<PriceObject | undefined>(undefined);
+
+  const { sendTransaction, isError, isPending, isSuccess, data, error } =
+    useSendTransaction();
 
   const recipient = friends.find((friend) => friend.address === id);
 
@@ -57,32 +63,41 @@ export default function SendMoneyScreen() {
       return;
     }
 
-    setLoading(true);
+    // setLoading(true);
     console.log('Sending:', amount);
     const amountInETH = getETHAmount();
     console.log('Amount in ETH:', amountInETH);
     if (!amountInETH) {
       console.log('Invalid ETH amount');
-      setLoading(false);
+      // setLoading(false);
       return;
     }
     if (!recipient || !recipient.address) {
       console.log('Recipient address is not valid');
-      setLoading(false);
+      // setLoading(false);
       return;
     }
     await sendETH(amountInETH, recipient.address);
-    setLoading(false);
-     Toast.show({
+    // setLoading(false);
+    console.log('is success:', isSuccess);  
+    Toast.show({
       type: 'success',
       text1: 'Transfer Sent 🚀',
-      text2: `You sent ${formatCurrency(parseFloat(amount))} to ${recipient.name || recipient.address}`,
+      text2: `You sent ${formatCurrency(parseFloat(amount))} to ${
+        recipient.name || recipient.address
+      }`,
     });
     router.push('/(tabs)/friends');
   };
 
-  async function sendETH(amount: number, recipientAddress: string) {
+  async function sendETH(amount: number, recipientAddress: `0x${string}`) {
     console.log(`Sending ${amount} ETH to ${recipientAddress}`);
+    const account = privateKeyToAccount('0x7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110')
+    sendTransaction({
+      account,
+      to: recipientAddress,
+      value: parseEther(amount.toString()),
+    });
   }
 
   function getETHAmount() {
@@ -93,23 +108,6 @@ export default function SendMoneyScreen() {
     }
     const price = parseFloat(priceResult);
     return parseFloat(amount) / price;
-  }
-
-  if (!recipient) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
-            <X size={24} color="#111827" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Send Money</Text>
-          <View style={styles.headerRight} />
-        </View>
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>Recipient not found</Text>
-        </View>
-      </SafeAreaView>
-    );
   }
 
   return (
@@ -127,6 +125,15 @@ export default function SendMoneyScreen() {
           <View style={styles.headerRight} />
         </View>
 
+        {!recipient ? (
+          <ScrollView style={styles.content}>
+          <View style={styles.recipientContainer}>
+            <Text style={styles.recipientName}>To:</Text>
+            <FormInput/>
+            <input name="address" placeholder="0xA0Cf…251e" required />
+            </View>
+            </ScrollView>
+            ) : (
         <ScrollView style={styles.content}>
           <View style={styles.recipientContainer}>
             <Avatar
@@ -141,6 +148,7 @@ export default function SendMoneyScreen() {
             <AmountInput value={amount} onChangeValue={handleChangeAmount} />
           </View>
         </ScrollView>
+            )}
 
         <View style={styles.footer}>
           <Button
@@ -150,7 +158,7 @@ export default function SendMoneyScreen() {
             onPress={handleSend}
             icon={<Send size={20} color="white" style={{ marginRight: 8 }} />}
             disabled={!amount || parseFloat(amount) <= 0}
-            loading={loading}
+            loading={isPending}
             fullWidth
           />
         </View>

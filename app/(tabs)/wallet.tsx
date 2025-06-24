@@ -9,6 +9,7 @@ import { ethers } from 'ethers';
 import { PriceObject } from '@/types';
 import Avatar from 'boring-avatars';
 import { router } from 'expo-router';
+import { SendTransaction } from '@/components/SendTransaction';
 
 export default function WalletScreen() {
   const [prices, setPrices] = useState<PriceObject | undefined>(
@@ -73,6 +74,7 @@ export default function WalletScreen() {
             </TouchableOpacity>
           </View>
         </View>
+            <SendTransaction />
       </ScrollView>
     </SafeAreaView>
   );

@@ -1,12 +1,9 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
-import { Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
-import { House as Home, Users, CirclePlus as PlusCircle, Wallet } from 'lucide-react-native';
-import { useRouter } from 'expo-router';
+import { Platform, StyleSheet } from 'react-native';
+import { House as Home, Users, Wallet } from 'lucide-react-native';
 
-export default function TabLayout() {
-  const router = useRouter();
-  
+export default function TabLayout() {  
   return (
     <Tabs
       screenOptions={{
@@ -30,26 +27,6 @@ export default function TabLayout() {
         options={{
           title: 'Friends',
           tabBarIcon: ({ color, size }) => <Users color={color} size={size} />,
-        }}
-      />
-      <Tabs.Screen
-        name="pay"
-        options={{
-          title: 'Pay',
-          tabBarButton: (props) => (
-            <TouchableOpacity
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              {...props as any}
-              style={styles.payButton}
-              onPress={() => {
-                router.push('/friends?action=pay');
-              }}
-            >
-              <View style={styles.payButtonInner}>
-                <PlusCircle size={32} color="white" />
-              </View>
-            </TouchableOpacity>
-          ),
         }}
       />
       <Tabs.Screen
