@@ -27,4 +27,4 @@ Demo template app for ZKsync SSO React Native SDK.
     bun dev
     ```
 
-It will run for the web version on (`http://localhost:8081/`)[http://localhost:8081/].
+It will run for the web version on [`http://localhost:8081/`](http://localhost:8081/).
