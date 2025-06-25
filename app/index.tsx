@@ -1,17 +1,57 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { View, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
-import { View, Button, Text } from 'react-native';
+import sdk from 'react-native-zksync-sso';
+import { type RpId } from 'react-native-zksync-sso';
+import LoggedOutView from '@/components/LoggedOutView';
+import { AccountDetails } from '@/types';
 
-export default function Login() {
+interface LoginProps {
+  rpId: RpId;
+}
+
+const Login: React.FC<LoginProps> = () => {
+  const [accountDetails, setAccountDetails] = useState<AccountDetails | null>(
+    null,
+  );
+
+  // Initialize platform-specific logging before any SDK usage
+  sdk.utils.initializePlatformLogger("io.jackpooley.MLSSOExampleRN");
+
+  const rpId = sdk.utils.createRpId(
+    "soo-sdk-example-pages.pages.dev", // RP ID (same for both platforms)
+    "android:apk-key-hash:..." // Android origin - ignored on iOS
+  );
+ 
+  console.log("ACCOUNT DETAILS: ", accountDetails);
+
+
+  if (accountDetails) {
+    router.replace('/(tabs)');
+    return null;
+  }
+
   return (
-    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-      <Text style={{ fontSize: 24, marginBottom: 12 }}>ZKsync SSO Pay</Text>
-      <Button
-        title="Login"
-        onPress={() => {
-          router.replace('/(tabs)');
+    <View style={styles.navigationContainer}>
+      <LoggedOutView
+        accountInfo={{
+          name: 'JDoe',
+          userID: 'jdoe',
+          rpId,
         }}
+        onAccountCreated={setAccountDetails}
+        onSignedIn={setAccountDetails}
       />
     </View>
   );
-}
+};
+
+const styles = StyleSheet.create({
+  navigationContainer: {
+    flex: 1,
+    width: '100%',
+  },
+});
+
+export default Login;
+
